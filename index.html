@@ -5,48 +5,68 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>3D 射擊靶場</title>
   <style>
-    html, body { margin:0; height:100%; overflow:hidden; background:#0b1020; color:#fff; font-family:Arial,sans-serif; }
-    #hud { position:fixed; top:12px; left:12px; z-index:10; background:rgba(0,0,0,.45); padding:10px 12px; border-radius:10px; }
-    #hint { position:fixed; bottom:14px; left:50%; transform:translateX(-50%); z-index:10; background:rgba(0,0,0,.45); padding:8px 12px; border-radius:10px; font-size:14px; }
+    html, body { margin:0; height:100%; overflow:hidden; background:#060b1a; color:#fff; font-family:Arial,sans-serif; }
+    #hud { position:fixed; top:12px; left:12px; z-index:10; background:rgba(8,10,24,.55); padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.12); }
+    #hint { position:fixed; bottom:14px; left:50%; transform:translateX(-50%); z-index:10; background:rgba(8,10,24,.55); padding:8px 12px; border-radius:10px; font-size:14px; border:1px solid rgba(255,255,255,.12); }
     #reticle { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); width:16px; height:16px; z-index:10; pointer-events:none; }
-    #reticle::before,#reticle::after{ content:''; position:absolute; background:#fff; }
+    #reticle::before,#reticle::after{ content:''; position:absolute; background:#fff; box-shadow:0 0 8px rgba(255,255,255,.8); }
     #reticle::before{ left:7px; top:0; width:2px; height:16px; }
     #reticle::after{ top:7px; left:0; height:2px; width:16px; }
     #start { position:fixed; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.6); z-index:20; }
-    button{ padding:10px 16px; border:0; border-radius:10px; cursor:pointer; font-weight:bold; }
+    button{ padding:10px 16px; border:0; border-radius:10px; cursor:pointer; font-weight:bold; background:#2563eb; color:white; }
   </style>
 </head>
 <body>
   <div id="hud">分數: <span id="score">0</span> ｜ 時間: <span id="time">60</span>s</div>
   <div id="reticle"></div>
-  <div id="hint">WASD 移動、滑鼠看向、左鍵射擊</div>
+  <div id="hint">WASD 移動（已修正方向）、滑鼠看向、左鍵射擊</div>
   <div id="start"><button id="startBtn">開始 3D 射擊靶場</button></div>
 
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0b1020);
+    scene.background = new THREE.Color(0x0b1330);
+    scene.fog = new THREE.Fog(0x0b1330, 25, 90);
 
     const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
     camera.position.set(0, 1.7, 8);
 
     const renderer = new THREE.WebGLRenderer({ antialias:true });
     renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     document.body.appendChild(renderer.domElement);
 
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x334455, 1.0);
+    // Lighting (more colorful)
+    scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+    const hemi = new THREE.HemisphereLight(0x7dd3fc, 0x312e81, 1.1);
     scene.add(hemi);
-    const dir = new THREE.DirectionalLight(0xffffff, 0.7);
-    dir.position.set(3, 10, 4);
-    scene.add(dir);
+    const key = new THREE.DirectionalLight(0xffffff, 0.7);
+    key.position.set(5, 12, 4);
+    scene.add(key);
+    const neon1 = new THREE.PointLight(0x22d3ee, 1.1, 45, 2);
+    neon1.position.set(-12, 6, -8);
+    scene.add(neon1);
+    const neon2 = new THREE.PointLight(0xf472b6, 1.0, 45, 2);
+    neon2.position.set(12, 5, 8);
+    scene.add(neon2);
 
+    // floor
     const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(200, 200),
-      new THREE.MeshStandardMaterial({ color:0x1f2937 })
+      new THREE.PlaneGeometry(220, 220),
+      new THREE.MeshStandardMaterial({ color:0x1f2937, roughness:0.9, metalness:0.05 })
     );
     floor.rotation.x = -Math.PI/2;
     scene.add(floor);
+
+    // colorful tiles for richer visuals
+    const tileGeo = new THREE.BoxGeometry(2, 0.02, 2);
+    for(let i=0;i<120;i++){
+      const c = new THREE.Color().setHSL(Math.random(), 0.55, 0.45);
+      const t = new THREE.Mesh(tileGeo, new THREE.MeshStandardMaterial({ color:c, emissive:c.clone().multiplyScalar(0.08) }));
+      t.position.set((Math.random()-0.5)*70, 0.01, (Math.random()-0.5)*70);
+      scene.add(t);
+    }
 
     const walls = new THREE.Group();
     const wallMat = new THREE.MeshStandardMaterial({ color:0x0f172a });
@@ -57,18 +77,40 @@
     mkWall(0,-30,60,1); mkWall(0,30,60,1); mkWall(-30,0,1,60); mkWall(30,0,1,60);
     scene.add(walls);
 
-    const targetMat = new THREE.MeshStandardMaterial({ color:0xff4d4d, emissive:0x220000 });
+    // targets
     const targets = [];
     function spawnTarget(){
-      const r = 0.6 + Math.random()*0.5;
-      const t = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 24), targetMat.clone());
+      const r = 0.55 + Math.random()*0.55;
+      const hue = Math.random();
+      const color = new THREE.Color().setHSL(hue, 0.8, 0.55);
+      const mat = new THREE.MeshStandardMaterial({ color, emissive: color.clone().multiplyScalar(0.35), roughness:0.35, metalness:0.2 });
+      const t = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 24), mat);
       t.position.set((Math.random()-0.5)*40, 1.2 + Math.random()*4, (Math.random()-0.5)*40);
       t.userData.vel = new THREE.Vector3((Math.random()-0.5)*1.8, (Math.random()-0.5)*0.6, (Math.random()-0.5)*1.8);
-      scene.add(t); targets.push(t);
+      scene.add(t);
+      targets.push(t);
     }
-    for(let i=0;i<14;i++) spawnTarget();
+    for(let i=0;i<16;i++) spawnTarget();
 
+    // gun model (first-person hand + gun)
+    const weapon = new THREE.Group();
+    const handMat = new THREE.MeshStandardMaterial({ color:0xffd7b5, roughness:0.8 });
+    const gunMat = new THREE.MeshStandardMaterial({ color:0x9ca3af, metalness:0.6, roughness:0.35 });
+    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.14,0.35), handMat);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.16,0.52), gunMat);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.45,16), gunMat);
+    barrel.rotation.x = Math.PI/2;
+    hand.position.set(0.12, -0.10, -0.08);
+    body.position.set(0.0, 0.0, -0.24);
+    barrel.position.set(0.0, 0.02, -0.54);
+    weapon.add(hand, body, barrel);
+    weapon.position.set(0.38, -0.34, -0.72); // bottom-right view
+    camera.add(weapon);
+    scene.add(camera);
+
+    // gameplay state
     const bullets = [];
+    const impacts = [];
     const bulletGeo = new THREE.SphereGeometry(0.09, 10, 10);
     const bulletMat = new THREE.MeshBasicMaterial({ color:0xfff59d });
 
@@ -78,22 +120,34 @@
     const timeEl = document.getElementById('time');
 
     const keys = {};
-    addEventListener('keydown', e=> keys[e.key.toLowerCase()] = true);
-    addEventListener('keyup', e=> keys[e.key.toLowerCase()] = false);
+    addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+    addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
     let yaw = 0, pitch = 0;
     let running = false;
+    let recoil = 0;
 
     function resetGame(){
-      score = 0; timeLeft = 60;
-      scoreEl.textContent = score; timeEl.textContent = timeLeft;
+      score = 0;
+      timeLeft = 60;
+      scoreEl.textContent = score;
+      timeEl.textContent = timeLeft;
       camera.position.set(0,1.7,8);
       yaw = 0; pitch = 0;
-      for (const t of targets) {
+      for(const t of targets){
         t.position.set((Math.random()-0.5)*40, 1.2 + Math.random()*4, (Math.random()-0.5)*40);
       }
-      for (const b of bullets) scene.remove(b.mesh);
+      for(const b of bullets) scene.remove(b.mesh);
       bullets.length = 0;
+      for(const i of impacts) scene.remove(i.mesh);
+      impacts.length = 0;
+    }
+
+    function spawnImpact(p){
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.04,8,8), new THREE.MeshBasicMaterial({color:0xffe082}));
+      mesh.position.copy(p);
+      scene.add(mesh);
+      impacts.push({mesh, life:0.2});
     }
 
     function shoot(){
@@ -101,9 +155,10 @@
       const d = new THREE.Vector3();
       camera.getWorldDirection(d);
       const mesh = new THREE.Mesh(bulletGeo, bulletMat);
-      mesh.position.copy(camera.position).addScaledVector(d, 0.6);
+      mesh.position.copy(camera.position).addScaledVector(d, 0.65);
       scene.add(mesh);
-      bullets.push({ mesh, vel: d.multiplyScalar(55), life: 1.4 });
+      bullets.push({ mesh, vel: d.multiplyScalar(58), life: 1.35 });
+      recoil = 0.06;
     }
     addEventListener('mousedown', shoot);
 
@@ -115,7 +170,7 @@
     });
 
     const startLayer = document.getElementById('start');
-    function bindStartBtn(){
+    function bindStart(){
       const btn = document.getElementById('startBtn');
       btn.onclick = ()=>{
         renderer.domElement.requestPointerLock();
@@ -124,7 +179,7 @@
         resetGame();
       };
     }
-    bindStartBtn();
+    bindStart();
 
     setInterval(()=>{
       if(!running) return;
@@ -134,12 +189,12 @@
         running = false;
         startLayer.style.display = 'grid';
         startLayer.innerHTML = `<button id="startBtn">再玩一次（分數 ${score}）</button>`;
-        bindStartBtn();
+        bindStart();
       }
     }, 1000);
 
     const clock = new THREE.Clock();
-    const vMove = new THREE.Vector3();
+    const move = new THREE.Vector3();
     const front = new THREE.Vector3();
     const right = new THREE.Vector3();
 
@@ -148,20 +203,19 @@
       const dt = Math.min(0.05, clock.getDelta());
 
       if(running){
-        // smoother movement based on camera facing direction
-        front.set(Math.sin(yaw), 0, Math.cos(yaw)).normalize();
+        // FIXED: forward direction reversed issue corrected
+        front.set(-Math.sin(yaw), 0, -Math.cos(yaw)).normalize();
         right.set(front.z, 0, -front.x).normalize();
 
-        vMove.set(0,0,0);
-        if(keys['w']) vMove.add(front);
-        if(keys['s']) vMove.addScaledVector(front, -1);
-        if(keys['a']) vMove.addScaledVector(right, -1);
-        if(keys['d']) vMove.add(right);
-        if(vMove.lengthSq()>0) vMove.normalize();
+        move.set(0,0,0);
+        if(keys['w']) move.add(front);
+        if(keys['s']) move.addScaledVector(front, -1);
+        if(keys['a']) move.addScaledVector(right, -1);
+        if(keys['d']) move.add(right);
+        if(move.lengthSq() > 0) move.normalize();
 
-        const moveSpeed = 8.8; // unit/sec
-        camera.position.addScaledVector(vMove, moveSpeed * dt);
-
+        const speed = 8.8;
+        camera.position.addScaledVector(move, speed * dt);
         camera.position.x = Math.max(-28, Math.min(28, camera.position.x));
         camera.position.z = Math.max(-28, Math.min(28, camera.position.z));
 
@@ -169,14 +223,18 @@
         camera.rotation.y = yaw;
         camera.rotation.x = pitch;
 
+        // weapon bob + recoil
+        const bob = Math.sin(performance.now() * 0.012) * (move.lengthSq() > 0 ? 0.01 : 0.003);
+        recoil = Math.max(0, recoil - dt * 0.18);
+        weapon.position.set(0.38, -0.34 - bob + recoil, -0.72 + recoil * 0.8);
+
         for(const t of targets){
           t.position.addScaledVector(t.userData.vel, dt);
-          if(Math.abs(t.position.x)>27) t.userData.vel.x *= -1;
-          if(t.position.y<1 || t.position.y>7) t.userData.vel.y *= -1;
-          if(Math.abs(t.position.z)>27) t.userData.vel.z *= -1;
+          if(Math.abs(t.position.x) > 27) t.userData.vel.x *= -1;
+          if(t.position.y < 1 || t.position.y > 7) t.userData.vel.y *= -1;
+          if(Math.abs(t.position.z) > 27) t.userData.vel.z *= -1;
         }
 
-        // bullets update + hit detect
         for(let i = bullets.length - 1; i >= 0; i--){
           const b = bullets[i];
           b.mesh.position.addScaledVector(b.vel, dt);
@@ -188,16 +246,25 @@
             if(b.mesh.position.distanceToSquared(t.position) <= rr*rr){
               score += 10;
               scoreEl.textContent = score;
+              spawnImpact(b.mesh.position);
               t.position.set((Math.random()-0.5)*40, 1.2 + Math.random()*4, (Math.random()-0.5)*40);
               hit = true;
               break;
             }
           }
 
-          if(hit || b.life <= 0 || Math.abs(b.mesh.position.x)>40 || Math.abs(b.mesh.position.y)>20 || Math.abs(b.mesh.position.z)>40){
+          if(hit || b.life <= 0 || Math.abs(b.mesh.position.x) > 42 || Math.abs(b.mesh.position.y) > 22 || Math.abs(b.mesh.position.z) > 42){
+            if(!hit) spawnImpact(b.mesh.position);
             scene.remove(b.mesh);
             bullets.splice(i,1);
           }
+        }
+
+        for(let i = impacts.length - 1; i >= 0; i--){
+          const p = impacts[i];
+          p.life -= dt;
+          p.mesh.scale.multiplyScalar(0.96);
+          if(p.life <= 0){ scene.remove(p.mesh); impacts.splice(i,1); }
         }
       }
 
