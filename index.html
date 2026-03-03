@@ -19,7 +19,7 @@
 <body>
   <div id="hud">分數: <span id="score">0</span> ｜ 時間: <span id="time">60</span>s</div>
   <div id="reticle"></div>
-  <div id="hint">WASD 移動（已修正方向）、Space 跳躍、滑鼠看向、左鍵射擊</div>
+  <div id="hint">WASD 移動、Space 跳躍、滑鼠看向、左鍵射擊、右鍵瞄準</div>
   <div id="start"><button id="startBtn">開始 3D 射擊靶場</button></div>
   <div id="pause" style="display:none;position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.55);place-items:center;">
     <div style="background:rgba(10,16,32,.9);border:1px solid rgba(255,255,255,.2);padding:16px 18px;border-radius:12px;min-width:260px;text-align:center;">
@@ -123,6 +123,7 @@
     const impacts = [];
     const bulletGeo = new THREE.SphereGeometry(0.09, 10, 10);
     const bulletMat = new THREE.MeshBasicMaterial({ color:0xfff59d });
+    let isAiming = false;
 
     let score = 0;
     let timeLeft = 60;
@@ -181,10 +182,19 @@
       const mesh = new THREE.Mesh(bulletGeo, bulletMat);
       mesh.position.copy(camera.position).addScaledVector(d, 0.65);
       scene.add(mesh);
-      bullets.push({ mesh, vel: d.multiplyScalar(58), life: 1.35 });
-      recoil = 0.06;
+      const speed = isAiming ? 68 : 58;
+      bullets.push({ mesh, vel: d.multiplyScalar(speed), life: 1.35 });
+      recoil = isAiming ? 0.03 : 0.06;
     }
-    addEventListener('mousedown', shoot);
+
+    addEventListener('contextmenu', (e) => e.preventDefault());
+    addEventListener('mousedown', (e) => {
+      if (e.button === 0) shoot();
+      if (e.button === 2 && running) isAiming = true;
+    });
+    addEventListener('mouseup', (e) => {
+      if (e.button === 2) isAiming = false;
+    });
 
     addEventListener('mousemove', (e)=>{
       if(document.pointerLockElement !== renderer.domElement) return;
@@ -290,10 +300,16 @@
         camera.rotation.y = yaw;
         camera.rotation.x = pitch;
 
-        // weapon bob + recoil
+        // weapon bob + recoil + aim-down-sight
         const bob = Math.sin(performance.now() * 0.012) * (move.lengthSq() > 0 ? 0.01 : 0.003);
         recoil = Math.max(0, recoil - dt * 0.18);
-        weapon.position.set(0.38, -0.34 - bob + recoil, -0.72 + recoil * 0.8);
+        const aimOffsetX = isAiming ? 0.17 : 0.38;
+        const aimOffsetY = isAiming ? -0.26 : -0.34;
+        const aimOffsetZ = isAiming ? -0.58 : -0.72;
+        weapon.position.set(aimOffsetX, aimOffsetY - bob + recoil, aimOffsetZ + recoil * 0.8);
+        weapon.rotation.set(isAiming ? -0.04 : 0, isAiming ? 0.03 : 0, 0);
+        camera.fov += ((isAiming ? 62 : 75) - camera.fov) * Math.min(1, dt * 12);
+        camera.updateProjectionMatrix();
 
         for(const t of targets){
           t.position.addScaledVector(t.userData.vel, dt);
