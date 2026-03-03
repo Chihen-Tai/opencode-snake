@@ -8,33 +8,61 @@
     html, body { margin:0; height:100%; overflow:hidden; background:#060b1a; color:#fff; font-family:Arial,sans-serif; }
     #hud { position:fixed; top:12px; left:12px; z-index:10; background:rgba(8,10,24,.55); padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.12); }
     #hint { position:fixed; bottom:14px; left:50%; transform:translateX(-50%); z-index:10; background:rgba(8,10,24,.55); padding:8px 12px; border-radius:10px; font-size:14px; border:1px solid rgba(255,255,255,.12); }
+    #leaderboard { position:fixed; top:12px; right:12px; z-index:10; width:260px; background:rgba(8,10,24,.55); padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.12); }
+    #leaderboard h4 { margin:0 0 8px 0; }
+    #lbList { margin:0; padding-left:20px; font-size:14px; line-height:1.5; }
     #reticle { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); width:16px; height:16px; z-index:10; pointer-events:none; }
     #reticle::before,#reticle::after{ content:''; position:absolute; background:#fff; box-shadow:0 0 8px rgba(255,255,255,.8); }
     #reticle::before{ left:7px; top:0; width:2px; height:16px; }
     #reticle::after{ top:7px; left:0; height:2px; width:16px; }
-    #start { position:fixed; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.6); z-index:20; }
+    #start, #pause, #scoreModal { position:fixed; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.6); z-index:20; }
+    #pause, #scoreModal { display:none; }
+    .panel { background:rgba(10,16,32,.92); border:1px solid rgba(255,255,255,.2); padding:16px 18px; border-radius:12px; min-width:280px; text-align:center; }
     button{ padding:10px 16px; border:0; border-radius:10px; cursor:pointer; font-weight:bold; background:#2563eb; color:white; }
+    input { padding:10px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:#fff; width:220px; }
   </style>
 </head>
 <body>
   <div id="hud">分數: <span id="score">0</span> ｜ 時間: <span id="time">60</span>s</div>
+  <div id="leaderboard">
+    <h4>🏆 排行榜 Top 10</h4>
+    <ol id="lbList"><li>載入中...</li></ol>
+  </div>
   <div id="reticle"></div>
+
   <div id="scope" style="display:none;position:fixed;inset:0;z-index:11;pointer-events:none;">
     <div style="position:absolute;inset:0;background:radial-gradient(circle at center, rgba(0,0,0,0) 0 19%, rgba(0,0,0,.65) 21% 100%);"></div>
     <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(52vmin,520px);height:min(52vmin,520px);border:3px solid rgba(255,255,255,.92);border-radius:50%;box-shadow:0 0 0 2px rgba(0,0,0,.45) inset, 0 0 18px rgba(255,255,255,.25);"></div>
     <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(52vmin,520px);height:2px;background:rgba(255,255,255,.9);"></div>
     <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:2px;height:min(52vmin,520px);background:rgba(255,255,255,.9);"></div>
   </div>
+
   <div id="hint">WASD 移動、Space 跳躍、滑鼠看向、左鍵射擊、右鍵瞄準（倍鏡）</div>
+
   <div id="start"><button id="startBtn">開始 3D 射擊靶場</button></div>
-  <div id="pause" style="display:none;position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.55);place-items:center;">
-    <div style="background:rgba(10,16,32,.9);border:1px solid rgba(255,255,255,.2);padding:16px 18px;border-radius:12px;min-width:260px;text-align:center;">
+
+  <div id="pause">
+    <div class="panel">
       <h3 style="margin:0 0 12px 0;">暫停選單</h3>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
         <button id="resumeBtn">繼續</button>
         <button id="restartBtn2" style="background:#7c3aed;">重開</button>
       </div>
       <div style="margin-top:10px;opacity:.8;font-size:13px;">按 ESC 也可關閉選單</div>
+    </div>
+  </div>
+
+  <div id="scoreModal">
+    <div class="panel">
+      <h3 style="margin:0 0 10px 0;">回合結束</h3>
+      <div id="finalScore" style="margin-bottom:10px;">你的分數：0</div>
+      <div style="margin-bottom:8px;">輸入名字上傳排行榜</div>
+      <input id="playerName" maxlength="16" placeholder="例如 Allen" />
+      <div style="margin-top:12px;display:flex;gap:10px;justify-content:center;">
+        <button id="submitScoreBtn">送出分數</button>
+        <button id="skipScoreBtn" style="background:#475569;">略過</button>
+      </div>
+      <div id="scoreMsg" style="margin-top:10px;font-size:13px;opacity:.85;"></div>
     </div>
   </div>
 
@@ -53,250 +81,206 @@
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     document.body.appendChild(renderer.domElement);
 
-    // Lighting (more colorful)
     scene.add(new THREE.AmbientLight(0xffffff, 0.35));
-    const hemi = new THREE.HemisphereLight(0x7dd3fc, 0x312e81, 1.1);
-    scene.add(hemi);
-    const key = new THREE.DirectionalLight(0xffffff, 0.7);
-    key.position.set(5, 12, 4);
-    scene.add(key);
-    const neon1 = new THREE.PointLight(0x22d3ee, 1.1, 45, 2);
-    neon1.position.set(-12, 6, -8);
-    scene.add(neon1);
-    const neon2 = new THREE.PointLight(0xf472b6, 1.0, 45, 2);
-    neon2.position.set(12, 5, 8);
-    scene.add(neon2);
+    scene.add(new THREE.HemisphereLight(0x7dd3fc, 0x312e81, 1.1));
+    const key = new THREE.DirectionalLight(0xffffff, 0.7); key.position.set(5, 12, 4); scene.add(key);
+    const neon1 = new THREE.PointLight(0x22d3ee, 1.1, 45, 2); neon1.position.set(-12, 6, -8); scene.add(neon1);
+    const neon2 = new THREE.PointLight(0xf472b6, 1.0, 45, 2); neon2.position.set(12, 5, 8); scene.add(neon2);
 
-    // floor
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(220, 220),
-      new THREE.MeshStandardMaterial({ color:0x1f2937, roughness:0.9, metalness:0.05 })
-    );
-    floor.rotation.x = -Math.PI/2;
-    scene.add(floor);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), new THREE.MeshStandardMaterial({ color:0x1f2937, roughness:0.9, metalness:0.05 }));
+    floor.rotation.x = -Math.PI/2; scene.add(floor);
 
-    // colorful tiles for richer visuals
     const tileGeo = new THREE.BoxGeometry(2, 0.02, 2);
     for(let i=0;i<120;i++){
       const c = new THREE.Color().setHSL(Math.random(), 0.55, 0.45);
       const t = new THREE.Mesh(tileGeo, new THREE.MeshStandardMaterial({ color:c, emissive:c.clone().multiplyScalar(0.08) }));
-      t.position.set((Math.random()-0.5)*70, 0.01, (Math.random()-0.5)*70);
-      scene.add(t);
+      t.position.set((Math.random()-0.5)*70, 0.01, (Math.random()-0.5)*70); scene.add(t);
     }
 
     const walls = new THREE.Group();
     const wallMat = new THREE.MeshStandardMaterial({ color:0x0f172a });
-    const mkWall = (x,z,w,d)=>{
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w,4,d), wallMat);
-      m.position.set(x,2,z); walls.add(m);
-    };
-    mkWall(0,-30,60,1); mkWall(0,30,60,1); mkWall(-30,0,1,60); mkWall(30,0,1,60);
-    scene.add(walls);
+    const mkWall = (x,z,w,d)=>{ const m = new THREE.Mesh(new THREE.BoxGeometry(w,4,d), wallMat); m.position.set(x,2,z); walls.add(m); };
+    mkWall(0,-30,60,1); mkWall(0,30,60,1); mkWall(-30,0,1,60); mkWall(30,0,1,60); scene.add(walls);
 
-    // targets
     const targets = [];
     function spawnTarget(){
       const r = 0.55 + Math.random()*0.55;
-      const hue = Math.random();
-      const color = new THREE.Color().setHSL(hue, 0.8, 0.55);
+      const color = new THREE.Color().setHSL(Math.random(), 0.8, 0.55);
       const mat = new THREE.MeshStandardMaterial({ color, emissive: color.clone().multiplyScalar(0.35), roughness:0.35, metalness:0.2 });
       const t = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 24), mat);
       t.position.set((Math.random()-0.5)*40, 1.2 + Math.random()*4, (Math.random()-0.5)*40);
       t.userData.vel = new THREE.Vector3((Math.random()-0.5)*1.8, (Math.random()-0.5)*0.6, (Math.random()-0.5)*1.8);
-      scene.add(t);
-      targets.push(t);
+      scene.add(t); targets.push(t);
     }
     for(let i=0;i<16;i++) spawnTarget();
 
-    // gun model (first-person hand + gun)
     const weapon = new THREE.Group();
-    const handMat = new THREE.MeshStandardMaterial({ color:0xffd7b5, roughness:0.8 });
-    const gunMat = new THREE.MeshStandardMaterial({ color:0x9ca3af, metalness:0.6, roughness:0.35 });
-    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.14,0.35), handMat);
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.16,0.52), gunMat);
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.45,16), gunMat);
+    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.14,0.35), new THREE.MeshStandardMaterial({ color:0xffd7b5, roughness:0.8 }));
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.16,0.52), new THREE.MeshStandardMaterial({ color:0x9ca3af, metalness:0.6, roughness:0.35 }));
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.45,16), new THREE.MeshStandardMaterial({ color:0x9ca3af, metalness:0.6, roughness:0.35 }));
     barrel.rotation.x = Math.PI/2;
-    hand.position.set(0.12, -0.10, -0.08);
-    body.position.set(0.0, 0.0, -0.24);
-    barrel.position.set(0.0, 0.02, -0.54);
-    weapon.add(hand, body, barrel);
-    weapon.position.set(0.38, -0.34, -0.72); // bottom-right view
-    camera.add(weapon);
-    scene.add(camera);
+    hand.position.set(0.12, -0.10, -0.08); body.position.set(0.0, 0.0, -0.24); barrel.position.set(0.0, 0.02, -0.54);
+    weapon.add(hand, body, barrel); weapon.position.set(0.38, -0.34, -0.72);
+    camera.add(weapon); scene.add(camera);
 
-    // gameplay state
-    const bullets = [];
-    const impacts = [];
+    const bullets = [], impacts = [];
     const bulletGeo = new THREE.SphereGeometry(0.09, 10, 10);
     const bulletMat = new THREE.MeshBasicMaterial({ color:0xfff59d });
     let isAiming = false;
 
-    let score = 0;
-    let timeLeft = 60;
+    let score = 0, timeLeft = 60;
     const scoreEl = document.getElementById('score');
     const timeEl = document.getElementById('time');
-    const scopeEl = document.getElementById('scope');
-    const reticleEl = document.getElementById('reticle');
+    const lbList = document.getElementById('lbList');
+    const scoreModal = document.getElementById('scoreModal');
+    const finalScoreEl = document.getElementById('finalScore');
+    const playerNameEl = document.getElementById('playerName');
+    const scoreMsgEl = document.getElementById('scoreMsg');
 
     const keys = {};
+    let yaw = 0, pitch = 0, running = false, recoil = 0, yVel = 0;
+    const playerHeight = 1.7, gravity = 24, jumpSpeed = 8.2;
+
     addEventListener('keydown', e => {
       const k = e.key.toLowerCase();
       keys[k] = true;
-      if ((k === ' ' || e.code === 'Space') && running && camera.position.y <= playerHeight + 0.001) {
-        yVel = jumpSpeed;
+      if ((k === ' ' || e.code === 'Space') && running && camera.position.y <= playerHeight + 0.001) yVel = jumpSpeed;
+      if (e.key === 'Escape') {
+        if (pauseLayer.style.display === 'grid') closePauseMenu();
+        else if (running) openPauseMenu();
       }
     });
-    addEventListener('keyup', e => {
-      const k = e.key.toLowerCase();
-      keys[k] = false;
-    });
-
-    let yaw = 0, pitch = 0;
-    let running = false;
-    let recoil = 0;
-    let yVel = 0;
-    const playerHeight = 1.7;
-    const gravity = 24;
-    const jumpSpeed = 8.2;
+    addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
     function resetGame(){
-      score = 0;
-      timeLeft = 60;
-      scoreEl.textContent = score;
-      timeEl.textContent = timeLeft;
-      camera.position.set(0,playerHeight,8);
-      yaw = 0; pitch = 0;
-      yVel = 0;
-      isAiming = false;
-      scopeEl.style.display = 'none';
-      reticleEl.style.display = 'block';
-      for(const t of targets){
-        t.position.set((Math.random()-0.5)*40, 1.2 + Math.random()*4, (Math.random()-0.5)*40);
-      }
-      for(const b of bullets) scene.remove(b.mesh);
-      bullets.length = 0;
-      for(const i of impacts) scene.remove(i.mesh);
-      impacts.length = 0;
+      score = 0; timeLeft = 60;
+      scoreEl.textContent = score; timeEl.textContent = timeLeft;
+      camera.position.set(0,playerHeight,8); yaw = 0; pitch = 0; yVel = 0;
+      isAiming = false; scopeEl.style.display = 'none'; reticleEl.style.display = 'block';
+      for (const t of targets) t.position.set((Math.random()-0.5)*40, 1.2 + Math.random()*4, (Math.random()-0.5)*40);
+      for (const b of bullets) scene.remove(b.mesh); bullets.length = 0;
+      for (const i of impacts) scene.remove(i.mesh); impacts.length = 0;
     }
 
     function spawnImpact(p){
       const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.04,8,8), new THREE.MeshBasicMaterial({color:0xffe082}));
-      mesh.position.copy(p);
-      scene.add(mesh);
-      impacts.push({mesh, life:0.2});
+      mesh.position.copy(p); scene.add(mesh); impacts.push({mesh, life:0.2});
     }
 
     function shoot(){
       if(!running) return;
-      const d = new THREE.Vector3();
-      camera.getWorldDirection(d);
+      const d = new THREE.Vector3(); camera.getWorldDirection(d);
       const mesh = new THREE.Mesh(bulletGeo, bulletMat);
       mesh.position.copy(camera.position).addScaledVector(d, 0.65);
       scene.add(mesh);
-      const speed = isAiming ? 68 : 58;
-      bullets.push({ mesh, vel: d.multiplyScalar(speed), life: 1.35 });
+      bullets.push({ mesh, vel: d.multiplyScalar(isAiming ? 68 : 58), life: 1.35 });
       recoil = isAiming ? 0.03 : 0.06;
     }
 
-    addEventListener('contextmenu', (e) => e.preventDefault());
-    addEventListener('mousedown', (e) => {
+    addEventListener('contextmenu', e => e.preventDefault());
+    addEventListener('mousedown', e => {
       if (e.button === 0) shoot();
-      if (e.button === 2 && running) {
-        isAiming = true;
-        scopeEl.style.display = 'block';
-        reticleEl.style.display = 'none';
-      }
+      if (e.button === 2 && running) { isAiming = true; scopeEl.style.display = 'block'; reticleEl.style.display = 'none'; }
     });
-    addEventListener('mouseup', (e) => {
-      if (e.button === 2) {
-        isAiming = false;
-        scopeEl.style.display = 'none';
-        reticleEl.style.display = 'block';
-      }
+    addEventListener('mouseup', e => {
+      if (e.button === 2) { isAiming = false; scopeEl.style.display = 'none'; reticleEl.style.display = 'block'; }
     });
 
-    addEventListener('mousemove', (e)=>{
+    addEventListener('mousemove', e => {
       if(document.pointerLockElement !== renderer.domElement) return;
-      yaw -= e.movementX * 0.0022;
-      pitch -= e.movementY * 0.0018;
+      yaw -= e.movementX * 0.0022; pitch -= e.movementY * 0.0018;
       pitch = Math.max(-Math.PI/2 + 0.05, Math.min(Math.PI/2 - 0.05, pitch));
     });
 
     const startLayer = document.getElementById('start');
     const pauseLayer = document.getElementById('pause');
-    const resumeBtn = document.getElementById('resumeBtn');
-    const restartBtn2 = document.getElementById('restartBtn2');
+    const scopeEl = document.getElementById('scope');
+    const reticleEl = document.getElementById('reticle');
 
     function openPauseMenu(){
       if(!running) return;
-      running = false;
-      isAiming = false;
-      scopeEl.style.display = 'none';
-      reticleEl.style.display = 'block';
-      pauseLayer.style.display = 'grid';
-      document.exitPointerLock?.();
+      running = false; isAiming = false; scopeEl.style.display = 'none'; reticleEl.style.display = 'block';
+      pauseLayer.style.display = 'grid'; document.exitPointerLock?.();
     }
+    function closePauseMenu(){ pauseLayer.style.display = 'none'; running = true; renderer.domElement.requestPointerLock(); }
 
-    function closePauseMenu(){
-      pauseLayer.style.display = 'none';
-      running = true;
-      renderer.domElement.requestPointerLock();
-    }
-
-    resumeBtn.onclick = closePauseMenu;
-    restartBtn2.onclick = () => {
-      resetGame();
-      closePauseMenu();
-    };
-
-    addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        if (pauseLayer.style.display === 'grid') {
-          closePauseMenu();
-        } else if (running) {
-          openPauseMenu();
-        }
-      }
-    });
+    document.getElementById('resumeBtn').onclick = closePauseMenu;
+    document.getElementById('restartBtn2').onclick = () => { resetGame(); closePauseMenu(); };
 
     function bindStart(){
-
-      const btn = document.getElementById('startBtn');
-      btn.onclick = ()=>{
+      document.getElementById('startBtn').onclick = ()=>{
         renderer.domElement.requestPointerLock();
         startLayer.style.display = 'none';
-        running = true;
-        resetGame();
+        running = true; resetGame();
       };
     }
     bindStart();
 
+    async function loadLeaderboard(){
+      try {
+        const r = await fetch('/api/leaderboard');
+        const data = await r.json();
+        const rows = Array.isArray(data.items) ? data.items : [];
+        if(!rows.length){ lbList.innerHTML = '<li>目前還沒有紀錄</li>'; return; }
+        lbList.innerHTML = rows.map(x => `<li>${x.name} - ${x.score}</li>`).join('');
+      } catch {
+        lbList.innerHTML = '<li>排行榜載入失敗</li>';
+      }
+    }
+
+    async function submitScore(){
+      const name = (playerNameEl.value || '').trim().slice(0,16);
+      if(!name){ scoreMsgEl.textContent = '請先輸入名字'; return; }
+      scoreMsgEl.textContent = '送出中...';
+      try {
+        const r = await fetch('/api/score', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ name, score })
+        });
+        const data = await r.json();
+        if(!r.ok) throw new Error(data?.error || '送出失敗');
+        scoreMsgEl.textContent = '已送出！';
+        await loadLeaderboard();
+        setTimeout(()=>{
+          scoreModal.style.display = 'none';
+          startLayer.style.display = 'grid';
+          startLayer.innerHTML = `<button id="startBtn">再玩一次（分數 ${score}）</button>`;
+          bindStart();
+        }, 600);
+      } catch (e) {
+        scoreMsgEl.textContent = '送出失敗：' + e.message;
+      }
+    }
+
+    document.getElementById('submitScoreBtn').onclick = submitScore;
+    document.getElementById('skipScoreBtn').onclick = () => {
+      scoreModal.style.display = 'none';
+      startLayer.style.display = 'grid';
+      startLayer.innerHTML = `<button id="startBtn">再玩一次（分數 ${score}）</button>`;
+      bindStart();
+    };
+
     setInterval(()=>{
       if(!running) return;
-      timeLeft -= 1;
-      timeEl.textContent = timeLeft;
+      timeLeft -= 1; timeEl.textContent = timeLeft;
       if(timeLeft <= 0){
-        running = false;
-        isAiming = false;
-        scopeEl.style.display = 'none';
-        reticleEl.style.display = 'block';
-        startLayer.style.display = 'grid';
-        startLayer.innerHTML = `<button id="startBtn">再玩一次（分數 ${score}）</button>`;
-        bindStart();
+        running = false; isAiming = false; scopeEl.style.display = 'none'; reticleEl.style.display = 'block';
+        document.exitPointerLock?.();
+        finalScoreEl.textContent = `你的分數：${score}`;
+        playerNameEl.value = '';
+        scoreMsgEl.textContent = '';
+        scoreModal.style.display = 'grid';
       }
     }, 1000);
 
     const clock = new THREE.Clock();
-    const move = new THREE.Vector3();
-    const front = new THREE.Vector3();
-    const right = new THREE.Vector3();
+    const move = new THREE.Vector3(), front = new THREE.Vector3(), right = new THREE.Vector3();
 
     function animate(){
       requestAnimationFrame(animate);
       const dt = Math.min(0.05, clock.getDelta());
 
       if(running){
-        // FIXED: forward direction reversed issue corrected
         front.set(-Math.sin(yaw), 0, -Math.cos(yaw)).normalize();
         right.set(front.z, 0, -front.x).normalize();
 
@@ -307,34 +291,20 @@
         if(keys['d']) move.addScaledVector(right, -1);
         if(move.lengthSq() > 0) move.normalize();
 
-        const speed = 8.8;
-        camera.position.addScaledVector(move, speed * dt);
-
-        // jump physics
-        yVel -= gravity * dt;
-        camera.position.y += yVel * dt;
-        if (camera.position.y < playerHeight) {
-          camera.position.y = playerHeight;
-          yVel = 0;
-        }
+        camera.position.addScaledVector(move, 8.8 * dt);
+        yVel -= gravity * dt; camera.position.y += yVel * dt;
+        if (camera.position.y < playerHeight) { camera.position.y = playerHeight; yVel = 0; }
 
         camera.position.x = Math.max(-28, Math.min(28, camera.position.x));
         camera.position.z = Math.max(-28, Math.min(28, camera.position.z));
+        camera.rotation.order = 'YXZ'; camera.rotation.y = yaw; camera.rotation.x = pitch;
 
-        camera.rotation.order = 'YXZ';
-        camera.rotation.y = yaw;
-        camera.rotation.x = pitch;
-
-        // weapon bob + recoil + aim-down-sight
         const bob = Math.sin(performance.now() * 0.012) * (move.lengthSq() > 0 ? 0.01 : 0.003);
         recoil = Math.max(0, recoil - dt * 0.18);
-        const aimOffsetX = isAiming ? 0.17 : 0.38;
-        const aimOffsetY = isAiming ? -0.26 : -0.34;
-        const aimOffsetZ = isAiming ? -0.58 : -0.72;
-        weapon.position.set(aimOffsetX, aimOffsetY - bob + recoil, aimOffsetZ + recoil * 0.8);
+        const aimX = isAiming ? 0.17 : 0.38, aimY = isAiming ? -0.26 : -0.34, aimZ = isAiming ? -0.58 : -0.72;
+        weapon.position.set(aimX, aimY - bob + recoil, aimZ + recoil * 0.8);
         weapon.rotation.set(isAiming ? -0.04 : 0, isAiming ? 0.03 : 0, 0);
-        camera.fov += ((isAiming ? 62 : 75) - camera.fov) * Math.min(1, dt * 12);
-        camera.updateProjectionMatrix();
+        camera.fov += ((isAiming ? 55 : 75) - camera.fov) * Math.min(1, dt * 14); camera.updateProjectionMatrix();
 
         for(const t of targets){
           t.position.addScaledVector(t.userData.vel, dt);
@@ -344,47 +314,36 @@
         }
 
         for(let i = bullets.length - 1; i >= 0; i--){
-          const b = bullets[i];
-          b.mesh.position.addScaledVector(b.vel, dt);
-          b.life -= dt;
-
+          const b = bullets[i]; b.mesh.position.addScaledVector(b.vel, dt); b.life -= dt;
           let hit = false;
           for(const t of targets){
             const rr = (t.geometry.parameters.radius || 0.8) + 0.12;
             if(b.mesh.position.distanceToSquared(t.position) <= rr*rr){
-              score += 10;
-              scoreEl.textContent = score;
-              spawnImpact(b.mesh.position);
+              score += 10; scoreEl.textContent = score; spawnImpact(b.mesh.position);
               t.position.set((Math.random()-0.5)*40, 1.2 + Math.random()*4, (Math.random()-0.5)*40);
-              hit = true;
-              break;
+              hit = true; break;
             }
           }
-
           if(hit || b.life <= 0 || Math.abs(b.mesh.position.x) > 42 || Math.abs(b.mesh.position.y) > 22 || Math.abs(b.mesh.position.z) > 42){
             if(!hit) spawnImpact(b.mesh.position);
-            scene.remove(b.mesh);
-            bullets.splice(i,1);
+            scene.remove(b.mesh); bullets.splice(i,1);
           }
         }
 
         for(let i = impacts.length - 1; i >= 0; i--){
-          const p = impacts[i];
-          p.life -= dt;
-          p.mesh.scale.multiplyScalar(0.96);
-          if(p.life <= 0){ scene.remove(p.mesh); impacts.splice(i,1); }
+          impacts[i].life -= dt; impacts[i].mesh.scale.multiplyScalar(0.96);
+          if(impacts[i].life <= 0){ scene.remove(impacts[i].mesh); impacts.splice(i,1); }
         }
       }
-
       renderer.render(scene, camera);
     }
     animate();
 
     addEventListener('resize', ()=>{
-      camera.aspect = innerWidth/innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(innerWidth, innerHeight);
+      camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
     });
+
+    loadLeaderboard();
   </script>
 </body>
 </html>
