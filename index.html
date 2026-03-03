@@ -21,6 +21,16 @@
   <div id="reticle"></div>
   <div id="hint">WASD 移動（已修正方向）、Space 跳躍、滑鼠看向、左鍵射擊</div>
   <div id="start"><button id="startBtn">開始 3D 射擊靶場</button></div>
+  <div id="pause" style="display:none;position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.55);place-items:center;">
+    <div style="background:rgba(10,16,32,.9);border:1px solid rgba(255,255,255,.2);padding:16px 18px;border-radius:12px;min-width:260px;text-align:center;">
+      <h3 style="margin:0 0 12px 0;">暫停選單</h3>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <button id="resumeBtn">繼續</button>
+        <button id="restartBtn2" style="background:#7c3aed;">重開</button>
+      </div>
+      <div style="margin-top:10px;opacity:.8;font-size:13px;">按 ESC 也可關閉選單</div>
+    </div>
+  </div>
 
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
@@ -184,7 +194,41 @@
     });
 
     const startLayer = document.getElementById('start');
+    const pauseLayer = document.getElementById('pause');
+    const resumeBtn = document.getElementById('resumeBtn');
+    const restartBtn2 = document.getElementById('restartBtn2');
+
+    function openPauseMenu(){
+      if(!running) return;
+      running = false;
+      pauseLayer.style.display = 'grid';
+      document.exitPointerLock?.();
+    }
+
+    function closePauseMenu(){
+      pauseLayer.style.display = 'none';
+      running = true;
+      renderer.domElement.requestPointerLock();
+    }
+
+    resumeBtn.onclick = closePauseMenu;
+    restartBtn2.onclick = () => {
+      resetGame();
+      closePauseMenu();
+    };
+
+    addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (pauseLayer.style.display === 'grid') {
+          closePauseMenu();
+        } else if (running) {
+          openPauseMenu();
+        }
+      }
+    });
+
     function bindStart(){
+
       const btn = document.getElementById('startBtn');
       btn.onclick = ()=>{
         renderer.domElement.requestPointerLock();
