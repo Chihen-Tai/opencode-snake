@@ -19,7 +19,13 @@
 <body>
   <div id="hud">分數: <span id="score">0</span> ｜ 時間: <span id="time">60</span>s</div>
   <div id="reticle"></div>
-  <div id="hint">WASD 移動、Space 跳躍、滑鼠看向、左鍵射擊、右鍵瞄準</div>
+  <div id="scope" style="display:none;position:fixed;inset:0;z-index:11;pointer-events:none;">
+    <div style="position:absolute;inset:0;background:radial-gradient(circle at center, rgba(0,0,0,0) 0 19%, rgba(0,0,0,.65) 21% 100%);"></div>
+    <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(52vmin,520px);height:min(52vmin,520px);border:3px solid rgba(255,255,255,.92);border-radius:50%;box-shadow:0 0 0 2px rgba(0,0,0,.45) inset, 0 0 18px rgba(255,255,255,.25);"></div>
+    <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(52vmin,520px);height:2px;background:rgba(255,255,255,.9);"></div>
+    <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:2px;height:min(52vmin,520px);background:rgba(255,255,255,.9);"></div>
+  </div>
+  <div id="hint">WASD 移動、Space 跳躍、滑鼠看向、左鍵射擊、右鍵瞄準（倍鏡）</div>
   <div id="start"><button id="startBtn">開始 3D 射擊靶場</button></div>
   <div id="pause" style="display:none;position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.55);place-items:center;">
     <div style="background:rgba(10,16,32,.9);border:1px solid rgba(255,255,255,.2);padding:16px 18px;border-radius:12px;min-width:260px;text-align:center;">
@@ -129,6 +135,8 @@
     let timeLeft = 60;
     const scoreEl = document.getElementById('score');
     const timeEl = document.getElementById('time');
+    const scopeEl = document.getElementById('scope');
+    const reticleEl = document.getElementById('reticle');
 
     const keys = {};
     addEventListener('keydown', e => {
@@ -159,6 +167,9 @@
       camera.position.set(0,playerHeight,8);
       yaw = 0; pitch = 0;
       yVel = 0;
+      isAiming = false;
+      scopeEl.style.display = 'none';
+      reticleEl.style.display = 'block';
       for(const t of targets){
         t.position.set((Math.random()-0.5)*40, 1.2 + Math.random()*4, (Math.random()-0.5)*40);
       }
@@ -190,10 +201,18 @@
     addEventListener('contextmenu', (e) => e.preventDefault());
     addEventListener('mousedown', (e) => {
       if (e.button === 0) shoot();
-      if (e.button === 2 && running) isAiming = true;
+      if (e.button === 2 && running) {
+        isAiming = true;
+        scopeEl.style.display = 'block';
+        reticleEl.style.display = 'none';
+      }
     });
     addEventListener('mouseup', (e) => {
-      if (e.button === 2) isAiming = false;
+      if (e.button === 2) {
+        isAiming = false;
+        scopeEl.style.display = 'none';
+        reticleEl.style.display = 'block';
+      }
     });
 
     addEventListener('mousemove', (e)=>{
@@ -211,6 +230,9 @@
     function openPauseMenu(){
       if(!running) return;
       running = false;
+      isAiming = false;
+      scopeEl.style.display = 'none';
+      reticleEl.style.display = 'block';
       pauseLayer.style.display = 'grid';
       document.exitPointerLock?.();
     }
@@ -255,6 +277,9 @@
       timeEl.textContent = timeLeft;
       if(timeLeft <= 0){
         running = false;
+        isAiming = false;
+        scopeEl.style.display = 'none';
+        reticleEl.style.display = 'block';
         startLayer.style.display = 'grid';
         startLayer.innerHTML = `<button id="startBtn">再玩一次（分數 ${score}）</button>`;
         bindStart();
