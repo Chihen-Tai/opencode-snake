@@ -19,7 +19,7 @@
 <body>
   <div id="hud">分數: <span id="score">0</span> ｜ 時間: <span id="time">60</span>s</div>
   <div id="reticle"></div>
-  <div id="hint">WASD 移動（已修正方向）、滑鼠看向、左鍵射擊</div>
+  <div id="hint">WASD 移動（已修正方向）、Space 跳躍、滑鼠看向、左鍵射擊</div>
   <div id="start"><button id="startBtn">開始 3D 射擊靶場</button></div>
 
   <script type="module">
@@ -120,20 +120,34 @@
     const timeEl = document.getElementById('time');
 
     const keys = {};
-    addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
-    addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+    addEventListener('keydown', e => {
+      const k = e.key.toLowerCase();
+      keys[k] = true;
+      if ((k === ' ' || e.code === 'Space') && running && camera.position.y <= playerHeight + 0.001) {
+        yVel = jumpSpeed;
+      }
+    });
+    addEventListener('keyup', e => {
+      const k = e.key.toLowerCase();
+      keys[k] = false;
+    });
 
     let yaw = 0, pitch = 0;
     let running = false;
     let recoil = 0;
+    let yVel = 0;
+    const playerHeight = 1.7;
+    const gravity = 24;
+    const jumpSpeed = 8.2;
 
     function resetGame(){
       score = 0;
       timeLeft = 60;
       scoreEl.textContent = score;
       timeEl.textContent = timeLeft;
-      camera.position.set(0,1.7,8);
+      camera.position.set(0,playerHeight,8);
       yaw = 0; pitch = 0;
+      yVel = 0;
       for(const t of targets){
         t.position.set((Math.random()-0.5)*40, 1.2 + Math.random()*4, (Math.random()-0.5)*40);
       }
@@ -210,12 +224,21 @@
         move.set(0,0,0);
         if(keys['w']) move.add(front);
         if(keys['s']) move.addScaledVector(front, -1);
-        if(keys['a']) move.addScaledVector(right, -1);
-        if(keys['d']) move.add(right);
+        if(keys['a']) move.add(right);
+        if(keys['d']) move.addScaledVector(right, -1);
         if(move.lengthSq() > 0) move.normalize();
 
         const speed = 8.8;
         camera.position.addScaledVector(move, speed * dt);
+
+        // jump physics
+        yVel -= gravity * dt;
+        camera.position.y += yVel * dt;
+        if (camera.position.y < playerHeight) {
+          camera.position.y = playerHeight;
+          yVel = 0;
+        }
+
         camera.position.x = Math.max(-28, Math.min(28, camera.position.x));
         camera.position.z = Math.max(-28, Math.min(28, camera.position.z));
 
