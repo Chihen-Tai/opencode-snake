@@ -1,20 +1,14 @@
-# Snake Game (Python Tkinter)
+# opencode-snake (Web)
 
-簡單的貪吃蛇遊戲，使用 Python 內建 `tkinter`，不需額外安裝套件。
+網頁版貪吃蛇遊戲（純 HTML/CSS/JavaScript）。
 
-## 執行
+## 本機測試
+直接開 `index.html` 即可，或用任意靜態伺服器。
 
-```bash
-python3 snake.py
-```
-
-## 操作
-
-- 方向鍵或 `W A S D`：移動
-- `R`：重開
-
-## 功能
-
-- 計分
-- 牆壁/撞到自己即結束
-- 食物隨機生成
+## 部署到 Vercel
+1. Push 到 GitHub（本 repo 已完成）
+2. 到 Vercel 匯入 `Chihen-Tai/opencode-snake`
+3. Framework Preset 選 `Other`
+4. Build Command 留空
+5. Output Directory 留空（根目錄）
+6. Deploy
